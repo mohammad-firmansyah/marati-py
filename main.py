@@ -9,6 +9,9 @@ from config.database import Base,Engine,SessionLocal
 from sqlalchemy.orm import Session
 from model.Model import Models
 import json
+import uuid
+from sqlalchemy import cast, String
+
 
 app = FastAPI()
 Base.metadata.create_all(bind=Engine)
@@ -152,10 +155,10 @@ async def update_model(id: str, db: db_dependancy,
         db.flush()
         raise HTTPException(status_code=500, detail='Internal Server Error')
    
-@app.get("/models/{owner_id}")
-async def get_model_by_owner_id(owner_id:str,db:db_dependancy):
-    result = db.query(Models).filter(Models.owner_id == owner_id).first()
+@app.get("/models/user/")
+async def get_model_by_owner_id(owner_id: uuid.UUID ,db:db_dependancy):
+    result = db.query(Models).filter(cast(Models.owner_id, String) == cast(owner_id, String) ).all()
     if not result:
-        return HTTPException(status_code=404,detail='Model Not Found')
+        return HTTPException(status_code=404,detail='Owner Not Found')
     
     return result
