@@ -152,3 +152,10 @@ async def update_model(id: str, db: db_dependancy,
         db.flush()
         raise HTTPException(status_code=500, detail='Internal Server Error')
    
+@app.get("/models/{owner_id}")
+async def get_model_by_owner_id(owner_id:str,db:db_dependancy):
+    result = db.query(Models).filter(Models.owner_id == owner_id).first()
+    if not result:
+        return HTTPException(status_code=404,detail='Model Not Found')
+    
+    return result
