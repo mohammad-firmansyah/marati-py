@@ -95,31 +95,37 @@ async def update_model(id: str, db: db_dependancy,
                        name:str=None,
                        input:str= None,
                        output:str = None,
-                       owner_id:str= None,):
+                       owner_id:str= None):
     
     model_db = db.query(Models).filter(Models.id == id).first()
 
     if not model_db:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Model not found')
 
-    if (file!=None):
+    if file != None:
         # delete existing model
         file_path = f'./files/{model_db.filename}'
         if os.path.exists(file_path):
             try:
                 os.remove(file_path)
+
+                # add new file
                 newFileName = ''.join(random.choices(string.ascii_lowercase + string.digits, k=9))+".h5"
                 with open(f"files/{newFileName}", "wb") as f:
                     f.write(file.file.read())
 
-                new_model = Models(name=name, filename=newFileName, input=json.loads(input), output=json.loads(output), owner_id=owner_id)
-                db.add(new_model)
+                model_db.name = name
+                model_db.input = json.loads(input)
+                model_db.filename = newFileName
+                model_db.output = json.loads(output)
+                model_db.owner_id = owner_id
+                
                 db.commit()
 
                 return JSONResponse({
                     'is_error': False,
-                    'message': 'Model created successfully'
-                }, status_code=201)
+                    'message': 'Model updated successfully'
+                }, status_code=200)
             
             except Exception as e:
                 print(f"Error removing file '{model_db.filename}': {str(e)}")
@@ -128,16 +134,20 @@ async def update_model(id: str, db: db_dependancy,
         
     # update model without updated file
     try:
-        new_model = Models(name=name, filename=model_db.filename, input=json.loads(input), output=json.loads(output), owner_id=owner_id)
-        db.add(new_model)
+        model_db.name = name
+        model_db.input = json.loads(input)
+        model_db.output = json.loads(output)
+        model_db.owner_id = owner_id
+    
         db.commit()
 
         return JSONResponse({
             'is_error': False,
-            'message': 'Model created successfully'
+            'message': 'Model updated successfully'
         }, status_code=201)
 
     except Exception as e:
+        print(e)
         db.rollback()
         db.flush()
         raise HTTPException(status_code=500, detail='Internal Server Error')
