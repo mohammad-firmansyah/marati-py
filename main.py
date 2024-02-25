@@ -11,12 +11,12 @@ from model.Model import Models
 import json
 import uuid
 from sqlalchemy import cast, String
-
+import tensorflow as tf
+import numpy as np
+import pickle
 
 app = FastAPI()
 Base.metadata.create_all(bind=Engine)
-
-
 
 def get_db():
     db=SessionLocal()
@@ -42,11 +42,14 @@ async def get_model(id:str,db:db_dependancy):
 
 @app.post("/models/")
 async def add_model(file:UploadFile,name:str,input:str,output:str,owner_id:str,db:db_dependancy):
-    if file.content_type != 'application/octet-stream':
-        raise HTTPException(status_code=415, detail='Unsupported Media Type')
+    print(file.filename)
+    
+    type = file.filename.split(".")[1]
+    if type != "h5" and type != "sav" :
+        return HTTPException(status_code=415, detail='Unsupported Media Type')
 
     try:
-        newFileName = ''.join(random.choices(string.ascii_lowercase + string.digits, k=9))+".h5"
+        newFileName = f"{random.choices(string.ascii_lowercase + string.digits, k=9)}.{type}"
         with open(f"files/{newFileName}", "wb") as f:
             f.write(file.file.read())
 
@@ -162,3 +165,25 @@ async def get_model_by_owner_id(owner_id: uuid.UUID ,db:db_dependancy):
         return HTTPException(status_code=404,detail='Owner Not Found')
     
     return result
+
+@app.get("/model/predict/")
+async def predict(id:str,db:db_dependancy):
+    model_db = db.query(Models).filter(Models.id == id).first()
+    
+    if not model_db:
+        return HTTPException(status_code=404,detail="Model not found")
+    
+    # load model
+    modelPath = f"files/{model_db.filename}"
+    model = tf.keras.models.load_model(modelPath)
+    
+    try:
+        value = np.array([[-6.04313345e-16,-3.90828578e-01,-1.77118587e-01,1.33263596e-01,-1.81614136e-02,-8.64182596e-01,1.78194369e+00,3.95504231e-02,1.17889387]])
+        predict = model.predict(value)
+        print(predict)
+    except Exception as e:
+        return JSONResponse({
+            "is_error":True,
+            "message": "Input not correctly provided by user"
+        })
+        
