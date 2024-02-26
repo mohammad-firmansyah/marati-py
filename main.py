@@ -167,7 +167,7 @@ async def get_model_by_owner_id(owner_id: uuid.UUID ,db:db_dependancy):
     return result
 
 @app.get("/model/predict/")
-async def predict(id:str,db:db_dependancy):
+async def predict(id:str,input:str,db:db_dependancy):
     model_db = db.query(Models).filter(Models.id == id).first()
     
     if not model_db:
@@ -176,12 +176,19 @@ async def predict(id:str,db:db_dependancy):
     # load model
     modelPath = f"files/{model_db.filename}"
     model = tf.keras.models.load_model(modelPath)
-    
+
     try:
-        value = np.array([[-6.04313345e-16,-3.90828578e-01,-1.77118587e-01,1.33263596e-01,-1.81614136e-02,-8.64182596e-01,1.78194369e+00,3.95504231e-02,1.17889387]])
+        # change array from user to be arr 2d
+        value = np.array([json.loads(input)["value"]])
+        # predict model
         predict = model.predict(value)
-        print(predict)
+        return JSONResponse({
+            "is_error":False,
+            "message": "Prediction has been succeed",
+            "output": json.dumps(str(predict[0,0]))
+        })
     except Exception as e:
+        print(e)
         return JSONResponse({
             "is_error":True,
             "message": "Input not correctly provided by user"
