@@ -36,7 +36,11 @@ async def get_models(db:db_dependancy):
 async def get_model(id:str,db:db_dependancy):
     result = db.query(Models).filter(Models.id == id).first()
     if not result:
-        return HTTPException(status_code=404,detail='Model Not Found')
+        return JSONResponse({
+            "is_error":True,
+            "message": "Model not found",
+            "data": {}
+        },404)
     
     return result
 
@@ -46,7 +50,11 @@ async def add_model(file:UploadFile,name:str,input:str,output:str,owner_id:str,d
     
     type = file.filename.split(".")[1]
     if type != "h5" and type != "sav" :
-        return HTTPException(status_code=415, detail='Unsupported Media Type')
+         return JSONResponse({
+            "is_error":True,
+            "message": "Unsupported media type",
+            "data": {}
+        },400)
 
     try:
         newFileName = f"{random.choices(string.ascii_lowercase + string.digits, k=9)}.{type}"
@@ -65,14 +73,22 @@ async def add_model(file:UploadFile,name:str,input:str,output:str,owner_id:str,d
     except Exception as e:
         db.rollback()
         db.flush()
-        raise HTTPException(status_code=500, detail='Internal Server Error')
+        return JSONResponse({
+            "is_error":True,
+            "message": "Model not found",
+            "data": {}
+        },404)
 
 @app.delete("/models/")
 async def delete_model(id:str,db:db_dependancy):
     model_db = db.query(Models).filter(Models.id == id).first()
     
     if not model_db:
-        return HTTPException(status_code=404,detail='Model Not Found')
+         return JSONResponse({
+            "is_error":True,
+            "message": "Model not found",
+            "data": {}
+        },400)
     
     file_path = f'./files/{model_db.filename}'
 
@@ -96,7 +112,7 @@ async def delete_model(id:str,db:db_dependancy):
 
 
 @app.put("/models/{id}")
-async def update_model(id: str, db: db_dependancy,
+async def update_model(id: uuid.UUID, db: db_dependancy,
                        file:UploadFile = None,
                        name:str=None,
                        input:str= None,
@@ -106,7 +122,11 @@ async def update_model(id: str, db: db_dependancy,
     model_db = db.query(Models).filter(Models.id == id).first()
 
     if not model_db:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Model not found')
+         return JSONResponse({
+            "is_error":True,
+            "message": "Model not found",
+            "data": {}
+        },404)
 
     if file != None:
         # delete existing model
@@ -162,16 +182,24 @@ async def update_model(id: str, db: db_dependancy,
 async def get_model_by_owner_id(owner_id: uuid.UUID ,db:db_dependancy):
     result = db.query(Models).filter(cast(Models.owner_id, String) == cast(owner_id, String) ).all()
     if not result:
-        return HTTPException(status_code=404,detail='Owner Not Found')
+         return JSONResponse({
+            "is_error":True,
+            "message": "Owner not found",
+            "data": {}
+        },404)
     
     return result
 
 @app.get("/model/predict/")
-async def predict(id:str,input:str,db:db_dependancy):
+async def predict(id:uuid.UUID,input:str,db:db_dependancy):
     model_db = db.query(Models).filter(Models.id == id).first()
-    
+        
     if not model_db:
-        return HTTPException(status_code=404,detail="Model not found")
+        return JSONResponse({
+            "is_error":True,
+            "message": "Model not found",
+            "data": {}
+        },404)
     
     # load model
     modelPath = f"files/{model_db.filename}"
@@ -185,12 +213,13 @@ async def predict(id:str,input:str,db:db_dependancy):
         return JSONResponse({
             "is_error":False,
             "message": "Prediction has been succeed",
-            "output": json.dumps(str(predict[0,0]))
+            "data": {}
         })
     except Exception as e:
         print(e)
         return JSONResponse({
             "is_error":True,
-            "message": "Input not correctly provided by user"
-        })
+            "message": "Input not correctly provided by user",
+            "data":{}
+        },400)
         
