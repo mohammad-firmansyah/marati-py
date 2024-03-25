@@ -3,6 +3,7 @@ import random
 import string
 from fastapi import FastAPI,HTTPException,Depends,Response,status,Form,File, UploadFile
 from fastapi.responses import JSONResponse
+from sqlalchemy.ext.declarative import DeclarativeMeta
 from pydantic import BaseModel
 from typing import List,Annotated,Dict
 from config.database import Base,Engine,SessionLocal
@@ -30,7 +31,12 @@ db_dependancy = Annotated[Session,Depends(get_db)]
 @app.get("/models/")
 async def get_models(db:db_dependancy):
     result = db.query(Models).all()
-    return result
+
+    return {
+        "is_error":False,
+        "message":"get all data",
+        "data":result
+    }
 
 @app.get("/models/{id}")
 async def get_model(id:str,db:db_dependancy):
@@ -42,13 +48,16 @@ async def get_model(id:str,db:db_dependancy):
             "data": {}
         },404)
     
-    return result
+    return JSONResponse({
+            "is_error":False,
+            "message": "get model by id success",
+            "data": result
+        },200)
 
 @app.post("/models/")
-async def add_model(file:UploadFile,name:str,input:str,output:str,owner_id:str,db:db_dependancy):
-    print(file.filename)
-    
+async def add_model(file:UploadFile,name:str,input:str,output:str,owner_id:str,desc:str,category:str,db:db_dependancy):
     type = file.filename.split(".")[1]
+    
     if type != "h5" and type != "sav" :
          return JSONResponse({
             "is_error":True,
@@ -56,28 +65,41 @@ async def add_model(file:UploadFile,name:str,input:str,output:str,owner_id:str,d
             "data": {}
         },400)
 
+    
+    letters = string.ascii_lowercase
+    random1 = ''.join(random.choice(letters) for i in range(20))
+    
+    
     try:
-        newFileName = f"{random.choices(string.ascii_lowercase + string.digits, k=9)}.{type}"
+
+        newFileName = f"{random1}.{type}"
+        new_model = Models(name=name, filename=newFileName, input=json.loads(input),description=desc,category=category,output=json.loads(output), owner_id=owner_id)
+        print(newFileName)
+
         with open(f"files/{newFileName}", "wb") as f:
             f.write(file.file.read())
-
-        new_model = Models(name=name, filename=newFileName, input=json.loads(input), output=json.loads(output), owner_id=owner_id)
+        
         db.add(new_model)
         db.commit()
 
-        return JSONResponse({
+        if (new_model != None):
+            return JSONResponse({
             'is_error': False,
             'message': 'Model created successfully'
         }, status_code=201)
 
+
+        
+
     except Exception as e:
         db.rollback()
         db.flush()
+        print(e)
         return JSONResponse({
             "is_error":True,
-            "message": "Model not found",
+            "message": "Model build error",
             "data": {}
-        },404)
+        },500)
 
 @app.delete("/models/")
 async def delete_model(id:str,db:db_dependancy):
@@ -109,7 +131,6 @@ async def delete_model(id:str,db:db_dependancy):
         'is_error': False,
         'message': 'Model deleted successfully'
     }, status_code=200)
-
 
 @app.put("/models/{id}")
 async def update_model(id: uuid.UUID, db: db_dependancy,
@@ -184,11 +205,31 @@ async def get_model_by_owner_id(owner_id: uuid.UUID ,db:db_dependancy):
     if not result:
          return JSONResponse({
             "is_error":True,
-            "message": "Owner not found",
-            "data": {}
-        },404)
+            "message": "data not found",
+            "data": []
+        },200)
     
-    return result
+    return {
+        "is_error":False,
+        "message":"get all models by owner",
+        "data":result
+    }
+   
+@app.get("/models/category/")
+async def get_model_by_category(category: str ,db:db_dependancy):
+    result = db.query(Models).filter(Models.category == category ).all()
+    if not result:
+         return JSONResponse({
+            "is_error":True,
+            "message": "data not found",
+            "data": []
+        },200)
+    
+    return {
+        "is_error":False,
+        "message":"get all models by category",
+        "data":result
+    }
 
 @app.get("/model/predict/")
 async def predict(id:uuid.UUID,input:str,db:db_dependancy):
